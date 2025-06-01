@@ -6,6 +6,7 @@ export interface OpenAICompatibleTool {
 		parameters: unknown;
 	};
 }
+
 // system message
 
 export interface OpenAICompatibleSystemMessage {

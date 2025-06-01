@@ -1,5 +1,5 @@
 {
-	"name": "limbo-utils",
+	"name": "@limbo/openai-utils",
 	"scripts": {
 		"build": "tsup"
 	},
