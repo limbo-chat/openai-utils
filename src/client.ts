@@ -1,52 +1,45 @@
-import type { OpenAICompatibleMessage, OpenAICompatibleTool } from "./types";
+import type * as limbo from "limbo";
+import {
+	convertMessagesToOpenAICompatible,
+	convertToolIdToOpenAICompatible,
+	convertToolsToOpenAICompatible,
+} from "./utils";
 
-export declare namespace OpenAICompatibleClient {
-	export interface Options {
-		baseUrl: string;
-		apiKey?: string;
-	}
-
-	export interface StreamChatCompletionOptions {
-		model: string;
-		messages: OpenAICompatibleMessage[];
-		tools?: OpenAICompatibleTool[];
+export declare namespace ClientAdapter {
+	export interface RequestOptions {
+		url: string;
+		method: string;
+		body?: string;
+		headers?: Record<string, string>;
 		abortSignal?: AbortSignal;
 	}
 }
 
-export class OpenAICompatibleClient {
-	private baseUrl: string;
-	private apiKey: string | null;
+export interface ClientAdapter {
+	requestStream(opts: ClientAdapter.RequestOptions): AsyncGenerator<string, void, unknown>;
+}
 
-	constructor(opts: OpenAICompatibleClient.Options) {
-		this.baseUrl = opts.baseUrl;
-		this.apiKey = opts.apiKey ?? null;
-	}
-
-	public async *streamChatCompletion(opts: OpenAICompatibleClient.StreamChatCompletionOptions) {
-		const requestHeaders = this.createRequestHeaders();
-
-		const response = await fetch(`${this.baseUrl}/chat/completions`, {
-			headers: requestHeaders,
+export class FetchAdapter implements ClientAdapter {
+	async *requestStream(opts: ClientAdapter.RequestOptions) {
+		const response = await fetch(opts.url, {
+			method: opts.method,
+			headers: opts.headers,
+			body: opts.body,
 			signal: opts.abortSignal,
-			body: JSON.stringify({
-				model: opts.model,
-				messages: opts.messages,
-				tools: opts.tools,
-				stream: true,
-			}),
 		});
 
-		if (!response.ok || !response.body) {
-			throw new Error(`Failed to stream chat completion: ${response.statusText}`);
+		if (!response.ok) {
+			throw new Error(`Fetch error: ${response.status} ${response.statusText}`);
+		}
+
+		if (!response.body) {
+			throw new Error("Response body is not readable");
 		}
 
 		const reader = response.body.getReader();
-		const decoder = new TextDecoder("utf8");
+		const decoder = new TextDecoder();
 
 		try {
-			let buffer = "";
-
 			while (true) {
 				const readResult = await reader.read();
 
@@ -54,61 +47,203 @@ export class OpenAICompatibleClient {
 					break;
 				}
 
-				const chunk = readResult.value;
+				const chunk = decoder.decode(readResult.value, { stream: true });
 
-				buffer += decoder.decode(chunk, { stream: true });
-
-				while (true) {
-					const lineEndIdx = buffer.indexOf("\n");
-
-					// no complete line available yet
-					if (lineEndIdx === -1) {
-						break;
-					}
-
-					const line = buffer.slice(0, lineEndIdx).trim();
-
-					buffer = buffer.slice(lineEndIdx + 1);
-
-					if (line.startsWith("data: ")) {
-						const rawData = line.slice(6);
-
-						if (rawData === "[DONE]") {
-							break;
-						}
-
-						let parsedData;
-
-						try {
-							parsedData = JSON.parse(rawData);
-						} catch {
-							// noop, ignore
-						}
-
-						// what should this be named?
-						const delta = parsedData.choices[0].delta;
-
-						if (delta) {
-							yield delta;
-						}
-					}
-				}
+				yield chunk;
 			}
-		} catch (error) {
 		} finally {
 			reader.releaseLock();
 		}
 	}
+}
 
-	private createRequestHeaders(): Headers {
-		const headers = new Headers();
+export declare namespace OpenAICompatibleClient {
+	export interface Options {
+		adapter: ClientAdapter;
+		baseUrl: string;
+		apiKey?: string;
+	}
 
-		headers.set("Content-Type", "application/json");
+	export interface RequestOptions {
+		path: string;
+		method: string;
+		body?: string;
+		json?: boolean;
+		headers?: Record<string, string>;
+		abortSignal?: AbortSignal;
+	}
+}
 
-		if (this.apiKey !== null) {
+export class OpenAICompatibleClient {
+	private adapter: ClientAdapter;
+	private baseUrl: string;
+	private apiKey: string | null;
+
+	constructor(opts: OpenAICompatibleClient.Options) {
+		this.adapter = opts.adapter;
+		this.baseUrl = opts.baseUrl;
+		this.apiKey = opts.apiKey ?? null;
+	}
+
+	public async requestStream(opts: OpenAICompatibleClient.RequestOptions) {
+		const headers = new Headers(opts.headers);
+
+		if (opts.json) {
+			headers.set("Content-Type", "application/json");
+		}
+
+		if (this.apiKey) {
 			headers.set("Authorization", `Bearer ${this.apiKey}`);
 		}
 
-		return headers;
+		return this.adapter.requestStream({
+			url: this.baseUrl + opts.path,
+			method: opts.method,
+			body: opts.body,
+			headers: Object.fromEntries(headers.entries()),
+			abortSignal: opts.abortSignal,
+		});
+	}
+}
+
+export declare namespace streamOpenAICompatibleChatCompletion {
+	export interface Options {
+		model: string;
+		tools?: limbo.LLM.Tool[];
+		messages: limbo.ChatPromptMessage[];
+		abortSignal?: AbortSignal;
+		onText: (text: string) => void;
+		onToolCall: (toolCall: limbo.LLM.ToolCall) => void;
+	}
+}
+
+export async function streamOpenAICompatibleChatCompletion(
+	client: OpenAICompatibleClient,
+	opts: streamOpenAICompatibleChatCompletion.Options
+) {
+	const openAIMessages = convertMessagesToOpenAICompatible(opts.messages);
+
+	let openAITools;
+
+	const originalToolIdMap = new Map<string, string>();
+
+	if (opts.tools) {
+		openAITools = convertToolsToOpenAICompatible(opts.tools);
+
+		for (const tool of opts.tools) {
+			const openAICompatibleId = convertToolIdToOpenAICompatible(tool.id);
+
+			originalToolIdMap.set(openAICompatibleId, tool.id);
+		}
+	}
+
+	const stream = await client.requestStream({
+		path: "/chat/completions",
+		method: "POST",
+		json: true,
+		body: JSON.stringify({
+			model: opts.model,
+			messages: openAIMessages,
+			tools: openAITools,
+			stream: true,
+		}),
+		abortSignal: opts.abortSignal,
+	});
+
+	const collectedToolCalls: { id: string; arguments: string }[] = [];
+
+	for await (const chunk of stream) {
+		const lines = chunk.split("\n") as string[];
+
+		for (const line of lines) {
+			const trimmedLine = line.trim();
+
+			if (trimmedLine === "" || !trimmedLine.startsWith("data:")) {
+				continue;
+			}
+
+			if (trimmedLine === "data: [DONE]") {
+				break;
+			}
+
+			const jsonData = trimmedLine.slice(6); // Remove 'data: ' prefix
+
+			let parsed;
+
+			try {
+				parsed = JSON.parse(jsonData);
+			} catch {
+				continue;
+			}
+
+			const delta = parsed?.choices[0]?.delta;
+
+			if (!delta) {
+				continue;
+			}
+
+			const text = delta?.content;
+			const partialToolCalls = delta.tool_calls;
+
+			if (text) {
+				opts.onText(text);
+			}
+
+			if (partialToolCalls) {
+				for (const partialToolCall of partialToolCalls) {
+					const toolInfo = partialToolCall.function;
+
+					if (!toolInfo) {
+						continue;
+					}
+
+					const partialToolCallIdx = partialToolCall.index;
+
+					if (typeof partialToolCallIdx !== "number") {
+						continue;
+					}
+
+					const toolCall = collectedToolCalls[partialToolCallIdx];
+
+					if (toolCall) {
+						if (toolInfo.name) {
+							// note: not sure if the name can be added to during the stream
+							toolCall.id += toolInfo.name;
+						}
+
+						if (typeof toolInfo.arguments === "string") {
+							toolCall.arguments += toolInfo.arguments;
+						}
+					} else {
+						collectedToolCalls.push({
+							id: toolInfo.name,
+							arguments: toolInfo.arguments || "",
+						});
+					}
+				}
+			}
+		}
+	}
+
+	for (const collectedToolCall of collectedToolCalls) {
+		const originalToolId = originalToolIdMap.get(collectedToolCall.id);
+
+		if (!originalToolId) {
+			// this will probably never happen
+			throw new Error(`Unknown tool call ID: ${collectedToolCall.id}`);
+		}
+
+		let parsedArguments;
+
+		try {
+			parsedArguments = JSON.parse(collectedToolCall.arguments);
+		} catch {
+			throw new Error("Failed to parse tool call arguments as JSON");
+		}
+
+		opts.onToolCall({
+			toolId: originalToolId,
+			arguments: parsedArguments,
+		});
 	}
 }

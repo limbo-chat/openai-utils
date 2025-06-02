@@ -23,8 +23,8 @@
 		"limbo": "file:../limbo-api"
 	},
 	"devDependencies": {
+		"limbo": "file:../limbo-api",
 		"tsup": "^8.5.0",
-		"typescript": "^5.8.3",
-		"limbo": "file:../limbo-api"
+		"typescript": "^5.8.3"
 	}
 }

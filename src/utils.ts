@@ -1,6 +1,7 @@
 import type * as limbo from "limbo";
 import type {
 	OpenAICompatibleAssistantMessage,
+	OpenAICompatibleContentPart,
 	OpenAICompatibleMessage,
 	OpenAICompatibleMessageToolCall,
 	OpenAICompatibleSystemMessage,
@@ -102,19 +103,27 @@ export function convertAssistantChatPromptMessageToOpenAICompatible(
 export function convertUserChatPromptMessageToOpenAICompatible(
 	message: limbo.ChatPromptMessage
 ): OpenAICompatibleUserMessage {
-	let textContent = "";
+	const openAIMessageContentParts: OpenAICompatibleContentPart[] = [];
 
 	for (const node of message.content) {
-		if (node.type !== "text") {
-			throw new Error("OpenAI-compatible user messages must only contain text nodes");
+		if (node.type === "text") {
+			openAIMessageContentParts.push({
+				type: "text",
+				text: node.data.content,
+			});
+		} else if (node.type === "image") {
+			openAIMessageContentParts.push({
+				type: "image_url",
+				image_url: {
+					url: node.data.url,
+				},
+			});
 		}
-
-		textContent += node.data.content;
 	}
 
 	return {
 		role: "user",
-		content: textContent,
+		content: openAIMessageContentParts,
 	};
 }
 
