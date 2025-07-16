@@ -1,4 +1,4 @@
-import type * as limbo from "limbo";
+import type * as limbo from "@limbo/api";
 import type {
 	OpenAICompatibleAssistantMessage,
 	OpenAICompatibleContentPart,
@@ -16,15 +16,15 @@ import type {
  * Limbo tool IDs often contain slashes, which are not compatible with OpenAI-compatible APIs.
  */
 export function convertToolIdToOpenAICompatible(toolId: string) {
-	return toolId.replace("/", "");
+	return toolId.replace("/", "_");
 }
 
 export function convertSystemChatPromptMessageToOpenAICompatible(
-	message: limbo.ChatPromptMessage
+	message: limbo.ChatMessage
 ): OpenAICompatibleSystemMessage {
 	let gatheredText = "";
 
-	for (const node of message.content) {
+	for (const node of message.getNodes()) {
 		if (node.type !== "text") {
 			throw new Error("OpenAI-compatible system messages must only contain text nodes");
 		}
@@ -39,18 +39,18 @@ export function convertSystemChatPromptMessageToOpenAICompatible(
 }
 
 export function convertAssistantChatPromptMessageToOpenAICompatible(
-	message: limbo.ChatPromptMessage
+	message: limbo.ChatMessage
 ): (OpenAICompatibleAssistantMessage | OpenAICompatibleToolMessage)[] {
 	let assistantMessageTextContent = "";
 
 	const toolCalls: OpenAICompatibleMessageToolCall[] = [];
 	const toolCallResults: OpenAICompatibleToolMessage[] = [];
 
-	for (const node of message.content) {
+	for (const node of message.getNodes()) {
 		if (node.type === "text") {
 			assistantMessageTextContent += node.data.content;
 		} else if (node.type === "tool_call") {
-			const toolCall = node.data;
+			const toolCall = node.data as any;
 
 			toolCalls.push({
 				type: "function",
@@ -101,21 +101,21 @@ export function convertAssistantChatPromptMessageToOpenAICompatible(
 }
 
 export function convertUserChatPromptMessageToOpenAICompatible(
-	message: limbo.ChatPromptMessage
+	message: limbo.ChatMessage
 ): OpenAICompatibleUserMessage {
 	const openAIMessageContentParts: OpenAICompatibleContentPart[] = [];
 
-	for (const node of message.content) {
+	for (const node of message.getNodes()) {
 		if (node.type === "text") {
 			openAIMessageContentParts.push({
 				type: "text",
-				text: node.data.content,
+				text: node.data.content as string,
 			});
 		} else if (node.type === "image") {
 			openAIMessageContentParts.push({
 				type: "image_url",
 				image_url: {
-					url: node.data.url,
+					url: node.data.url as string,
 				},
 			});
 		}
@@ -128,19 +128,21 @@ export function convertUserChatPromptMessageToOpenAICompatible(
 }
 
 export function convertMessagesToOpenAICompatible(
-	messages: limbo.ChatPromptMessage[]
+	messages: limbo.ChatMessage[]
 ): OpenAICompatibleMessage[] {
 	const openAIMessages: OpenAICompatibleMessage[] = [];
 
 	for (const message of messages) {
-		if (message.role === "system") {
+		const role = message.getRole();
+
+		if (role === "system") {
 			openAIMessages.push(convertSystemChatPromptMessageToOpenAICompatible(message));
-		} else if (message.role === "assistant") {
+		} else if (role === "assistant") {
 			openAIMessages.push(...convertAssistantChatPromptMessageToOpenAICompatible(message));
-		} else if (message.role === "user") {
+		} else if (role === "user") {
 			openAIMessages.push(convertUserChatPromptMessageToOpenAICompatible(message));
 		} else {
-			throw new Error(`message role is not OpenAI-compatible: ${message.role}`);
+			throw new Error(`message role is not OpenAI-compatible: ${role}`);
 		}
 	}
 
@@ -148,7 +150,9 @@ export function convertMessagesToOpenAICompatible(
 }
 
 // NOTE: Consider automatically adding "additionalProperties: false" to the schema
-export function convertToolsToOpenAICompatible(tools: limbo.LLM.Tool[]): OpenAICompatibleTool[] {
+export function convertToolsToOpenAICompatible(
+	tools: limbo.ToolDefinition[]
+): OpenAICompatibleTool[] {
 	return tools.map((tool) => {
 		const toolId = convertToolIdToOpenAICompatible(tool.id);
 

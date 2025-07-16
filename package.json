@@ -1,7 +1,8 @@
 {
 	"name": "@limbo/openai-utils",
 	"scripts": {
-		"build": "tsup"
+		"build": "tsup",
+		"typecheck": "tsc --noEmit"
 	},
 	"files": [
 		"package.json",
@@ -20,10 +21,10 @@
 		}
 	},
 	"peerDependencies": {
-		"limbo": "file:../limbo-api"
+		"@limbo/api": ">=0.0.0"
 	},
 	"devDependencies": {
-		"limbo": "file:../limbo-api",
+		"@limbo/api": "file:../limbo-api",
 		"tsup": "^8.5.0",
 		"typescript": "^5.8.3"
 	}

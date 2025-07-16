@@ -1,0 +1,5 @@
+useNodeVersion: 22.16.0
+engineStrict: true
+
+onlyBuiltDependencies:
+    - esbuild
