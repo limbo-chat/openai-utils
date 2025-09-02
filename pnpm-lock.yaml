@@ -8,9 +8,9 @@ importers:
 
   .:
     devDependencies:
-      '@limbo/api':
-        specifier: file:../limbo-api
-        version: file:../limbo-api
+      '@limbo-chat/api':
+        specifier: ^0.0.1
+        version: 0.0.1
       tsup:
         specifier: ^8.5.0
         version: 8.5.0(typescript@5.8.3)
@@ -192,8 +192,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.25':
     resolution: {integrity: sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ==}
 
-  '@limbo/api@file:../limbo-api':
-    resolution: {directory: ../limbo-api, type: directory}
+  '@limbo-chat/api@0.0.1':
+    resolution: {integrity: sha512-vUL++C3VdXSVCLGXP+NDYTpGDG1x9lb4YXoVeDJ8/C/ptwohvbrydkx8pITlFG6sOhWuo1yQ4rWGasxeBp5lgg==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -756,7 +756,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
 
-  '@limbo/api@file:../limbo-api':
+  '@limbo-chat/api@0.0.1':
     optionalDependencies:
       '@sinclair/typebox': 0.34.33
       '@types/react': 19.1.6

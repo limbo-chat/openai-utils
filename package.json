@@ -1,11 +1,29 @@
 {
-	"name": "@limbo/openai-utils",
+	"name": "@limbo-chat/openai-utils",
+	"type": "module",
+	"description": "OpenAI utilities for Limbo plugins",
+	"version": "0.0.1",
+	"license": "MIT",
+	"author": {
+		"name": "Wes Lowe",
+		"email": "wesley.jlowe10@gmail.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/limbo-chat/openai-utils"
+	},
+	"keywords": [
+		"limbo",
+		"llm",
+		"ai"
+	],
 	"scripts": {
 		"build": "tsup",
 		"typecheck": "tsc --noEmit"
 	},
 	"files": [
 		"package.json",
+		"README.md",
 		"dist"
 	],
 	"exports": {
@@ -21,10 +39,10 @@
 		}
 	},
 	"peerDependencies": {
-		"@limbo/api": ">=0.0.0"
+		"@limbo-chat/api": "^0.0.1"
 	},
 	"devDependencies": {
-		"@limbo/api": "file:../limbo-api",
+		"@limbo-chat/api": "^0.0.1",
 		"tsup": "^8.5.0",
 		"typescript": "^5.8.3"
 	}
