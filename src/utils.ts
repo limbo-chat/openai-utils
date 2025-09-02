@@ -88,7 +88,7 @@ export function convertAssistantChatPromptMessageToOpenAICompatible(
 	// add the assistant message
 	messages.push({
 		role: "assistant",
-		content: assistantMessageTextContent || null,
+		content: assistantMessageTextContent,
 		tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
 	});
 
@@ -150,7 +150,7 @@ export function convertMessagesToOpenAICompatible(
 }
 
 // NOTE: Consider automatically adding "additionalProperties: false" to the schema
-export function convertToolsToOpenAICompatible(
+export function convertToolDefinitionsToOpenAICompatible(
 	tools: limbo.ToolDefinition[]
 ): OpenAICompatibleTool[] {
 	return tools.map((tool) => {
